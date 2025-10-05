@@ -5,8 +5,7 @@
     "version": 1,
     "url": "https://manga.madokami.al",
     "languages": ["en"],
-    "contentRating": 0,
-    "author": "Muhammad Razan Alamudi"
+    "contentRating": 0
   },
   "listings": [
     {
@@ -15,4 +14,3 @@
     }
   ]
 }
-
