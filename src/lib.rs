@@ -1,11 +1,10 @@
 #![no_std]
 
 use aidoku::{
-    Chapter, DeepLinkHandler, DeepLinkResult, FilterValue, Home, HomeLayout, Listing,
-    ListingProvider, Manga, MangaPageResult, MangaStatus, Page, PageContent, Result, Source,
+    Chapter, ContentRating, DeepLinkHandler, DeepLinkResult, FilterValue, Home, HomeLayout, Listing,
+    ListingProvider, Manga, MangaPageResult, MangaStatus, Page, PageContent, Result, Source, Viewer,
     alloc::{String, Vec, string::ToString},
     imports::{defaults::defaults_get, net::*},
-    helpers::uri::encode_uri,
     prelude::*,
 };
 use base64::{engine::general_purpose, Engine as _};
@@ -147,8 +146,10 @@ impl Source for Madokami {
         _page: i32,
         _filters: Vec<FilterValue>,
     ) -> Result<MangaPageResult> {
-        let q = query.unwrap_or_default();
-        let url = format!("{BASE_URL}/search?q={}", encode_uri(q));
+    let q = query.unwrap_or_default();
+    // Site uses '+' for spaces in query (e.g., the+world+god+only+knows)
+    let plus_query = q.split_whitespace().collect::<Vec<&str>>().join("+");
+    let url = format!("{BASE_URL}/search?q={}", plus_query);
         let html = auth_get(&url)?.html()?;
         let entries = html
             .select("div.container table tbody tr")
@@ -168,6 +169,31 @@ impl Source for Madokami {
     }
 
     fn get_manga_update(&self, mut manga: Manga, needs_details: bool, needs_chapters: bool) -> Result<Manga> {
+        // Canonicalize key similar to Tachiyomi logic for /Manga/ and /Raws/ variants
+    // Canonicalization may adjust manga.key but we don't need to track if it changed.
+        if manga.key.starts_with("/Manga/") {
+            // Pattern: /Manga/<Initial>/<Title>/... remove extra segments beyond 5
+            // Split and if length > 6 ("", "Manga", initial, title, maybe extra) trim to first 5 segments
+            let parts: Vec<&str> = manga.key.split('/').collect();
+            if parts.len() > 6 && parts.get(2).map(|s| s.len() == 1).unwrap_or(false) {
+                // Keep: "", "Manga", initial, title, next two segments (index 0..=5)
+                let canon = parts[0..=5].join("/");
+                manga.key = if canon.starts_with('/') { canon } else { format!("/{}", canon) };
+            }
+        } else if manga.key.starts_with("/Raws/") {
+            // Trim trailing segments starting with '!' while remaining length >= 3
+            let mut parts: Vec<&str> = manga.key.split('/').collect();
+            let mut changed_local = false;
+            while parts.len() > 3 {
+                if let Some(last) = parts.last() { if last.starts_with('!') { parts.pop(); changed_local = true; continue; } }
+                break;
+            }
+            if changed_local {
+                let canon = parts.join("/");
+                manga.key = if canon.starts_with('/') { canon } else { format!("/{}", canon) };
+            }
+        }
+
         let url = format!("{BASE_URL}{}", manga.key);
         let html = auth_get(&url)?.html()?;
 
@@ -205,6 +231,25 @@ impl Source for Madokami {
             manga.tags = html.select("div.genres a.tag").map(|els| {
                 els.filter_map(|e| e.text()).collect::<Vec<String>>()
             });
+            // Content rating classification
+            if let Some(tags) = &manga.tags {
+                let nsfw_terms = ["Doujinshi", "Adult", "Mature", "Smut"];
+                if tags.iter().any(|t| nsfw_terms.iter().any(|n| t == n)) {
+                    manga.content_rating = ContentRating::NSFW;
+                } else if tags.iter().any(|t| t == "Ecchi") {
+                    manga.content_rating = ContentRating::Suggestive;
+                } else {
+                    manga.content_rating = ContentRating::Safe;
+                }
+                // Viewer classification
+                if tags.iter().any(|t| t == "Manga") {
+                    manga.viewer = Viewer::RightToLeft;
+                } else if tags.iter().any(|t| matches!(t.as_str(), "Manhwa" | "Manhua" | "Webtoon")) {
+                    manga.viewer = Viewer::Webtoon;
+                } else {
+                    manga.viewer = Viewer::Unknown;
+                }
+            }
         }
 
         if needs_chapters {
@@ -220,7 +265,8 @@ impl Source for Madokami {
                         .as_ref()
                         .and_then(|t| t.split(' ').find_map(|s| s.parse::<f32>().ok()))
                         .unwrap_or(-1.0);
-                    Some(Chapter { key, title, chapter_number: Some(chapter_num), date_uploaded: Some(date_uploaded), ..Default::default() })
+                    let url_full = format!("{BASE_URL}{}", key);
+                    Some(Chapter { key, title, chapter_number: Some(chapter_num), date_uploaded: Some(date_uploaded), url: Some(url_full), ..Default::default() })
                 })
                 .rev()
                 .collect::<Vec<Chapter>>()
@@ -303,3 +349,4 @@ impl DeepLinkHandler for Madokami {
 // REGISTER SOURCE
 // =================================================================================
 register_source!(Madokami, ListingProvider, Home, DeepLinkHandler);
+
