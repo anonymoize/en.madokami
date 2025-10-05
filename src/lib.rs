@@ -34,9 +34,9 @@ fn authenticated_request(url: &str, method: Method) -> Request {
 // =================================================================================
 
 #[derive(Default)]
-struct Madokami;
+struct enmadokami;
 
-impl Source for Madokami {
+impl Source for enmadokami {
 
 	/// This function is called when the user performs a search.
 	fn get_search_manga_list(&self, filters: Vec<Filter>, _page: i32) -> Result<MangaPageResult> {
@@ -146,7 +146,7 @@ impl Source for Madokami {
 // LISTING PROVIDER
 // =================================================================================
 /// This handles browsing the "Recent" tab on the source's main page.
-impl ListingProvider for Madokami {
+impl ListingProvider for enmadokami {
 	fn get_manga_list(&self, listing: Listing, page: i32) -> Result<MangaPageResult> {
 		if listing.id == "recent" {
 			let url = format!("{}/recent?page={}", BASE_URL, page);
@@ -180,14 +180,14 @@ impl ListingProvider for Madokami {
 // HOME & DEEPLINK (STUBS)
 // =================================================================================
 // Madokami doesn't have a rich homepage, so we'll return an empty layout.
-impl Home for Madokami {
+impl Home for enmadokami {
 	fn get_home(&self) -> Result<HomeLayout> {
 		Ok(HomeLayout::default())
 	}
 }
 
 // Madokami URLs are straightforward, but we'll add this for completeness.
-impl DeepLinkHandler for Madokami {
+impl DeepLinkHandler for enmadokami {
     fn handle_deep_link(&self, url: String) -> Result<Option<DeepLinkResult>> {
         // Example: https://manga.madokami.al/Manga/S/SU/SUZU/Suzuki-san-wa-Ichi-Rin-no-Hana/
         // We just need the path part as the manga ID.
@@ -204,5 +204,5 @@ impl DeepLinkHandler for Madokami {
 // =================================================================================
 // REGISTER SOURCE
 // =================================================================================
-register_source!(Madokami, ListingProvider, Home, DeepLinkHandler);
+register_source!(enmadokami, ListingProvider, Home, DeepLinkHandler);
 
