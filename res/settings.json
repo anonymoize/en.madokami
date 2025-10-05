@@ -1,0 +1,22 @@
+[
+  {
+    "type": "group",
+    "title": "Authentication",
+    "items": [
+      {
+        "type": "text",
+        "key": "username",
+        "title": "Username",
+        "placeholder": "Enter your Madokami username"
+      },
+      {
+        "type": "text",
+        "key": "password",
+        "title": "Password",
+        "secure": true,
+        "placeholder": "Enter your Madokami password"
+      }
+    ]
+  }
+]
+
