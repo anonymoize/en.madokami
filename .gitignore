@@ -2,3 +2,4 @@
 .idea
 *.aix
 tests.rs
+.DS_Store
